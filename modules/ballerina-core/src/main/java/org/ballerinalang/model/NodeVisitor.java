@@ -44,6 +44,7 @@ import org.ballerinalang.model.expressions.MapStructInitKeyValueExpr;
 import org.ballerinalang.model.expressions.ModExpression;
 import org.ballerinalang.model.expressions.MultExpression;
 import org.ballerinalang.model.expressions.NotEqualExpression;
+import org.ballerinalang.model.expressions.NullLiteral;
 import org.ballerinalang.model.expressions.OrExpression;
 import org.ballerinalang.model.expressions.RefTypeInitExpr;
 import org.ballerinalang.model.expressions.ResourceInvocationExpr;
@@ -53,6 +54,7 @@ import org.ballerinalang.model.expressions.SubtractExpression;
 import org.ballerinalang.model.expressions.TypeCastExpression;
 import org.ballerinalang.model.expressions.UnaryExpression;
 import org.ballerinalang.model.expressions.VariableRefExpr;
+import org.ballerinalang.model.expressions.VariableRefTypeAccessExpr;
 import org.ballerinalang.model.invokers.MainInvoker;
 import org.ballerinalang.model.statements.ActionInvocationStmt;
 import org.ballerinalang.model.statements.AssignStmt;
@@ -192,6 +194,8 @@ public interface NodeVisitor {
 
     void visit(StructFieldAccessExpr structAttributeAccessExpr);
 
+    void visit(VariableRefTypeAccessExpr variableRefTypeAccessExpr);
+
     void visit(BacktickExpr backtickExpr);
 
     void visit(ArrayInitExpr arrayInitExpr);
@@ -208,7 +212,9 @@ public interface NodeVisitor {
 
     void visit(VariableRefExpr variableRefExpr);
 
-
+    void visit(NullLiteral nullLiteral);
+    
+    
     void visit(StackVarLocation stackVarLocation);
 
     void visit(ServiceVarLocation serviceVarLocation);
