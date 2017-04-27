@@ -177,6 +177,7 @@ public class SemanticAnalyzer implements NodeVisitor {
     public void visit(BLangProgram bLangProgram) {
         BLangPackage mainPkg = bLangProgram.getMainPackage();
 
+
         if (bLangProgram.getProgramCategory() == BLangProgram.Category.MAIN_PROGRAM) {
             mainPkg.accept(this);
 
@@ -859,6 +860,17 @@ public class SemanticAnalyzer implements NodeVisitor {
             return;
         }
 
+
+        // Null can be assigned to only reference types
+        if (rExpr instanceof NullLiteral) {
+            if (BTypes.isValueType(varBType)) {
+                BLangExceptionHelper.throwSemanticError(rExpr, SemanticErrors.INCOMPATIBLE_ASSIGNMENT, rExpr.getType(),
+                    varBType);
+            }
+            rExpr.setType(varBType);
+            return;
+        }
+
         //todo any type support for RefTypeInitExpr
         if (rExpr instanceof RefTypeInitExpr) {
             RefTypeInitExpr refTypeInitExpr = (RefTypeInitExpr) rExpr;
@@ -941,6 +953,17 @@ public class SemanticAnalyzer implements NodeVisitor {
         // Now we know that this is a single value assignment statement.
         Expression lExpr = assignStmt.getLExprs()[0];
         BType lExprType = lExpr.getType();
+
+        if (rExpr instanceof NullLiteral) {
+            if (BTypes.isValueType(lExprType)) {
+                BLangExceptionHelper.throwSemanticError(lExpr, SemanticErrors.INCOMPATIBLE_TYPES,
+                    rExpr.getType(), lExpr.getType());
+            }
+
+            rExpr.setType(lExprType);
+            return;
+        }
+
 
         if (rExpr instanceof NullLiteral) {
             if (BTypes.isValueType(lExprType)) {
@@ -1932,6 +1955,13 @@ public class SemanticAnalyzer implements NodeVisitor {
                 sourceType, targetType);
         }
 
+
+        // casting a null literal is not supported.
+        if (rExpr instanceof NullLiteral) {
+            BLangExceptionHelper.throwSemanticError(typeCastExpression, SemanticErrors.INCOMPATIBLE_TYPES_CANNOT_CAST,
+                sourceType, targetType);
+        }
+
         // Check whether this is a native conversion
         if (sourceType == BTypes.typeAny || targetType == BTypes.typeAny || (BTypes.isValueType(sourceType) &&
                 BTypes.isValueType(targetType))) {
@@ -1941,6 +1971,11 @@ public class SemanticAnalyzer implements NodeVisitor {
         } else {
             linkTypeMapper(typeCastExpression, sourceType, targetType);
         }
+    }
+
+    @Override
+    public void visit(NullLiteral nullLiteral) {
+        nullLiteral.setType(BTypes.typeNull);
     }
 
     @Override
@@ -2081,6 +2116,32 @@ public class SemanticAnalyzer implements NodeVisitor {
     private BType verifyBinaryCompareExprType(BinaryExpression binaryExpression) {
         visitBinaryExpr(binaryExpression);
         BType type = verifyBinaryExprType(binaryExpression);
+        binaryExpression.setType(BTypes.typeBoolean);
+        return type;
+    }
+
+    private BType verifyBinaryEqualityExprType(BinaryExpression binaryExpression) {
+        visitBinaryExpr(binaryExpression);
+        BType rType = binaryExpression.getRExpr().getType();
+        BType lType = binaryExpression.getLExpr().getType();
+        BType type;
+
+        if (rType == BTypes.typeNull) {
+            if (BTypes.isValueType(lType)) {
+                BLangExceptionHelper.throwSemanticError(binaryExpression,
+                    SemanticErrors.INVALID_OPERATION_INCOMPATIBLE_TYPES, lType, rType);
+            }
+            type = rType;
+        } else if (lType == BTypes.typeNull) {
+            if (BTypes.isValueType(rType)) {
+                BLangExceptionHelper.throwSemanticError(binaryExpression,
+                    SemanticErrors.INVALID_OPERATION_INCOMPATIBLE_TYPES, lType, rType);
+            }
+            type = lType;
+        } else {
+            type = verifyBinaryExprType(binaryExpression);
+        }
+
         binaryExpression.setType(BTypes.typeBoolean);
         return type;
     }
@@ -2325,6 +2386,14 @@ public class SemanticAnalyzer implements NodeVisitor {
                         continue;
                     }
                     lhsType = ((Function) entry.getValue()).getParameterDefs()[i].getType();
+                }
+
+                BType rhsType = argExpr.getType();
+
+                // if the passed value is null, and the function parameter is a reference type,
+                // then its a match
+                if (rhsType instanceof BNullType && !BTypes.isValueType(lhsType)) {
+                    continue;
                 }
 
                 BType rhsType = argExpr.getType();
@@ -2974,6 +3043,35 @@ public class SemanticAnalyzer implements NodeVisitor {
             }
 
             currentScope.define(symbolName, structDef);
+
+            // Create the '<init>' function and inject it to the struct
+            BlockStmt.BlockStmtBuilder blockStmtBuilder = new BlockStmt.BlockStmtBuilder(
+                structDef.getNodeLocation(), structDef);
+            for (VariableDefStmt variableDefStmt : structDef.getFieldDefStmts()) {
+                blockStmtBuilder.addStmt(variableDefStmt);
+            }
+
+            BallerinaFunction.BallerinaFunctionBuilder functionBuilder =
+                    new BallerinaFunction.BallerinaFunctionBuilder(structDef);
+            functionBuilder.setNodeLocation(structDef.getNodeLocation());
+            functionBuilder.setName(structDef + ".<init>");
+            functionBuilder.setPkgPath(structDef.getPackagePath());
+            functionBuilder.setBody(blockStmtBuilder.build());
+            structDef.setInitFunction(functionBuilder.buildFunction());
+        }
+
+        // Define fields in each struct. This is done after defining all the structs,
+        // since a field of a struct can be another struct.
+        for (StructDef structDef : structDefs) {
+            SymbolScope tmpScope = currentScope;
+            currentScope = structDef;
+            for (VariableDefStmt fieldDefStmt : structDef.getFieldDefStmts()) {
+                fieldDefStmt.accept(this);
+            }
+            structDef.setStructMemorySize(structMemAddrOffset + 1);
+
+            structMemAddrOffset = -1;
+            currentScope = tmpScope;
 
             // Create the '<init>' function and inject it to the struct
             BlockStmt.BlockStmtBuilder blockStmtBuilder = new BlockStmt.BlockStmtBuilder(
