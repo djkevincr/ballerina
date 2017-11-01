@@ -38,6 +38,7 @@ import org.ballerinalang.util.codegen.attributes.CodeAttributeInfo;
 import org.ballerinalang.util.debugger.DebugInfoHolder;
 import org.ballerinalang.util.debugger.VMDebugManager;
 import org.ballerinalang.util.exceptions.BallerinaException;
+import org.ballerinalang.util.logging.NetworkLoggingUtils;
 
 import java.util.Map;
 
@@ -182,6 +183,12 @@ public class ResourceExecutor {
         StackFrame callerSF = new StackFrame(resourceInfo, defaultWorkerInfo, -1, new int[0]);
         callerSF.setRefRegs(new BRefType[1]);
         callerSF.getRefRegs()[0] = refLocalVars[0];
+
+        if (Boolean.TRUE.equals(Boolean.valueOf(System.getProperty("networklog.enabled")))) {
+            NetworkLoggingUtils.generateActivityID(context);
+            NetworkLoggingUtils.logResourceDispatch(context.getActivityID(),
+                    resourceInfo);
+        }
 
         BLangVM bLangVM = new BLangVM(packageInfo.getProgramFile());
         context.setAsResourceContext();

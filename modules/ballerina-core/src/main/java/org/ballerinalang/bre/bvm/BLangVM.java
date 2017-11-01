@@ -102,6 +102,7 @@ import org.ballerinalang.util.debugger.VMDebugManager;
 import org.ballerinalang.util.exceptions.BLangExceptionHelper;
 import org.ballerinalang.util.exceptions.BallerinaException;
 import org.ballerinalang.util.exceptions.RuntimeErrors;
+import org.ballerinalang.util.logging.NetworkLoggingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.wso2.ballerinalang.util.Lists;
@@ -540,6 +541,7 @@ public class BLangVM {
 
                     cpIndex = operands[1];
                     funcCallCPEntry = (FunctionCallCPEntry) constPool[cpIndex];
+                    logActionInvocation(actionInfo);
                     invokeCallableUnit(actionInfo, funcCallCPEntry);
                     break;
                 case InstructionCodes.NACALL:
@@ -549,6 +551,7 @@ public class BLangVM {
 
                     cpIndex = operands[1];
                     funcCallCPEntry = (FunctionCallCPEntry) constPool[cpIndex];
+                    logActionInvocation(actionInfo);
                     invokeNativeAction(actionInfo, funcCallCPEntry);
                     break;
                 case InstructionCodes.THROW:
@@ -2950,6 +2953,12 @@ public class BLangVM {
         // Copy return values to the callers stack
         controlStack.popFrame();
         handleReturnFromNativeCallableUnit(callerSF, funcCallCPEntry.getRetRegs(), returnValues, retTypes);
+    }
+
+    private void logActionInvocation(ActionInfo actionInfo) {
+        if (Boolean.TRUE.equals(Boolean.valueOf(System.getProperty("networklog.enabled")))) {
+            NetworkLoggingUtils.logConnectorActionDispatch(context.getActivityID(), actionInfo);
+        }
     }
 
     private void invokeNativeAction(ActionInfo actionInfo, FunctionCallCPEntry funcCallCPEntry) {

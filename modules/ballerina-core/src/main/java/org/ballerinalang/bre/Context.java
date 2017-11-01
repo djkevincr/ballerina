@@ -49,6 +49,7 @@ public class Context {
     private BallerinaTransactionManager ballerinaTransactionManager;
     private DebugInfoHolder debugInfoHolder;
     private boolean debugEnabled = false;
+    private String activityID;
 
     private int startIP;
     private BStruct unhandledError;
@@ -102,6 +103,14 @@ public class Context {
 
     public void setThreadId(String threadId) {
         this.threadId = threadId;
+    }
+
+    public String getActivityID() {
+        return activityID;
+    }
+
+    public void setActivityID(String activityID) {
+        this.activityID = activityID;
     }
 
     public boolean isDebugEnabled() {
